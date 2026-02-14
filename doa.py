@@ -13,7 +13,7 @@ J = 2
 # 条件2, 3: センサと信号源の位置
 # 波長λ
 LAMBDA = 2 ** (1.5)
-# 基準となる素子間隔
+# 素子間隔の基準
 D = LAMBDA / 2
 # センサ位置 (3次元空間内の同一平面 (z=0))
 # 線対称・回転対称にならない位置に配置
@@ -29,7 +29,7 @@ I = 100
 SNR = 20
 SIGMA = 10 ** (-SNR / 10)
 
-# 条件5: 雑音は全センサについて独立同分布なる白色複素ガウス雑音とする
+# 条件5: 雑音は全センサについて独立同分布な白色複素ガウス雑音とする
 N = np.sqrt(SIGMA / 2) * (np.random.randn(M, I) + 1j * np.random.randn(M, I))
 
 
@@ -58,16 +58,16 @@ def maximum_likelihood_method(t1, t2):
     H_theta = np.column_stack(
         [steering_vector(t1, SENSOR_POS), steering_vector(t2, SENSOR_POS)]
     )
-    # 投影行列
+    # 射影行列
     P_H = H_theta @ np.linalg.inv(H_theta.conj().T @ H_theta) @ H_theta.conj().T
     return np.real(np.trace(P_H @ R))
 
 
 # 3. シミュレーションに用いるデータの生成
 
-# 行列H (M x J)
+# 行列H (M × J)
 H = np.column_stack([steering_vector(t, SENSOR_POS) for t in TRUE_THETAS])
-# 信号源 S (J x I): 複素ガウス信号
+# 信号源 S (J × I): 複素ガウス信号
 S = (np.random.randn(J, I) + 1j * np.random.randn(J, I)) / np.sqrt(2)
 # 観測信号 Y
 Y = np.dot(H, S) + N
@@ -76,7 +76,6 @@ R = np.dot(Y, Y.conj().T) / I
 
 
 # 4. ビームフォーミング法による到来方向推定
-
 
 # 探索範囲(0°から180°まで0.5°刻み)
 search_thetas = np.linspace(0, 180, 360 + 1)
@@ -90,7 +89,6 @@ est_bf_thetas = search_thetas[p_bf_peaks]
 
 
 # 5. 最尤法による到来方向推定
-
 
 # 2次元探索範囲(0°から180°まで0.5°刻み)
 ml_search = np.linspace(0, 180, 360 + 1)
@@ -112,10 +110,10 @@ if ml_search[idx[0]] > ml_search[idx[1]]:
 
 # 6. グラフの作成
 
-
 # グラフのサイズを設定
 fig = plt.figure(figsize=(12, 5))
 # フォントを指定
+# 今回は游ゴシックを利用
 plt.rcParams["font.family"] = "Yu Gothic"
 
 # BF法のグラフ
