@@ -1,6 +1,9 @@
 import numpy as np
 import matplotlib.pyplot as plt
 
+# フォントを指定
+plt.rcParams["font.family"] = "Yu Gothic"
+
 
 # 1. 課題の条件設定
 
@@ -19,7 +22,7 @@ D = LAMBDA / 2
 # 線対称・回転対称にならない位置に配置
 SENSOR_POS = np.array([[0.0, 0.0], [1.2 * D, 0.3 * D], [0.5 * D, 1.5 * D]])
 
-# 条件4: 信号の到来方向θ
+# 条件4: 信号の到来方向θ(実験ごとに変更)
 TRUE_THETAS = np.array([30, 45])
 
 # 条件6: スナップショット数と雑音レベル
@@ -55,12 +58,12 @@ def beam_forming_method(theta):
 def maximum_likelihood_method(t1, t2):
     if t1 == t2:
         return 0
-    A_theta = np.column_stack(
+    H_theta = np.column_stack(
         [steering_vector(t1, SENSOR_POS), steering_vector(t2, SENSOR_POS)]
     )
-    # 投影行列 P_A = A * (A^H * A)^-1 * A^H
-    Proj = A_theta @ np.linalg.inv(A_theta.conj().T @ A_theta) @ A_theta.conj().T
-    return np.real(np.trace(Proj @ R))
+    # 投影行列
+    P_H = H_theta @ np.linalg.inv(H_theta.conj().T @ H_theta) @ H_theta.conj().T
+    return np.real(np.trace(P_H @ R))
 
 
 # 3. シミュレーションに用いるデータの生成
@@ -75,11 +78,12 @@ Y = np.dot(H, S) + N
 R = np.dot(Y, Y.conj().T) / I
 
 
-# 4. ビームフォーミング法によるDOA推定
+# 4. ビームフォーミング法による到来方向推定
+
 
 # 探索範囲(0°から180°まで0.5°刻み)
 search_thetas = np.linspace(0, 180, 360 + 1)
-# ビームフォーミング法の出力
+# ビームフォーミング法の出力を得る
 p_bf = [beam_forming_method(t) for t in search_thetas]
 # 正規化
 p_bf = np.array(p_bf) / np.max(p_bf)
@@ -88,30 +92,39 @@ est_bf_idx = np.argmax(p_bf)
 est_bf_theta = search_thetas[est_bf_idx]
 
 
-# 2次元探索
-ml_search = np.linspace(0, 180, 181)
-p_ml = np.zeros((len(ml_search), len(ml_search)))
+# 5. 最尤法による到来方向推定
 
+
+# 2次元探索範囲(0°から180°まで0.5°刻み)
+ml_search = np.linspace(0, 180, 360 + 1)
+# 最尤法の出力を得るための2次元配列を用意
+p_ml = np.zeros((len(ml_search), len(ml_search)))
+# 2次元探索を実行、結果をp_mlに格納
 for i, t1 in enumerate(ml_search):
     for j, t2 in enumerate(ml_search):
         p_ml[i, j] = maximum_likelihood_method(t1, t2)
-
-# MLの最大値
+# p_mlが最大となる(t1, t2)を推定値とする
 idx = np.unravel_index(np.argmax(p_ml), p_ml.shape)
 est_ml_thetas = (ml_search[idx[0]], ml_search[idx[1]])
 
-# グラフの作成
+
+# 6. グラフの作成
+
+
+# グラフのサイズを設定
 fig = plt.figure(figsize=(12, 5))
 
 # BF法のグラフ
 ax1 = fig.add_subplot(1, 2, 1)
+# 各θに対するP_BFをプロット
 ax1.plot(search_thetas, p_bf, label="P_BF(θ)")
+# 真のθを縦線で表示
 ax1.axvline(TRUE_THETAS[0], color="red", linestyle="--", label=f"True θ1")
 ax1.axvline(TRUE_THETAS[1], color="red", linestyle="--", label=f"True θ2")
-
-ax1.set_title("Beamforming Method")
-ax1.set_xlabel("θ [deg]")
-ax1.set_ylabel("P_BF (normalized)")
+# タイトルなどを設定
+ax1.set_title("ビームフォーミング法")
+ax1.set_xlabel("θ [°]")
+ax1.set_ylabel("P_BF (正規化済)")
 ax1.legend()
 ax1.grid(True)
 
@@ -125,14 +138,16 @@ im = ax2.imshow(
     aspect="auto",
     cmap=custom_cmap,
 )
+# 真のθを赤い×で表示
 ax2.scatter(
     TRUE_THETAS[1],
     TRUE_THETAS[0],
     color="red",
     marker="x",
     s=100,
-    label="True (θ1, θ2)",
+    label="真の (θ1, θ2)",
 )
+# 推定到来方向を白い丸で表示
 ax2.scatter(
     est_ml_thetas[1],
     est_ml_thetas[0],
@@ -141,6 +156,7 @@ ax2.scatter(
     edgecolors="black",
     label=f"Est: ({est_ml_thetas[0]:.1f}, {est_ml_thetas[1]:.1f})",
 )
+# 角度の順序を入れ替えたものも推定値として表示
 ax2.scatter(
     est_ml_thetas[0],
     est_ml_thetas[1],
@@ -149,9 +165,10 @@ ax2.scatter(
     edgecolors="black",
     label=f"Est: ({est_ml_thetas[1]:.1f}, {est_ml_thetas[0]:.1f})",
 )
-ax2.set_title("Maximum Likelihood Method")
-ax2.set_xlabel("θ2 [deg]")
-ax2.set_ylabel("θ1 [deg]")
+# タイトルなどを設定
+ax2.set_title("最尤法")
+ax2.set_xlabel("θ2 [°]")
+ax2.set_ylabel("θ1 [°]")
 plt.colorbar(im, ax=ax2, label="P_ML")
 ax2.legend()
 
