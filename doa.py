@@ -1,9 +1,6 @@
 import numpy as np
 import matplotlib.pyplot as plt
 
-# フォントを指定
-plt.rcParams["font.family"] = "Yu Gothic"
-
 
 # 1. 課題の条件設定
 
@@ -22,18 +19,18 @@ D = LAMBDA / 2
 # 線対称・回転対称にならない位置に配置
 SENSOR_POS = np.array([[0.0, 0.0], [1.2 * D, 0.3 * D], [0.5 * D, 1.5 * D]])
 
-# 条件4: 信号の到来方向θ(実験ごとに変更)
-TRUE_THETAS = np.array([30, 45])
+# 条件4: 信号の到来方向θ(実験ごとに変更、θ1 < θ2と仮定する)
+TRUE_THETAS = np.array([30, 35])
 
 # 条件6: スナップショット数と雑音レベル
 # スナップショット数
-I = 1000
-# 雑音レベル (dB)
+I = 100
+# 雑音レベルσ
 SNR = 20
+SIGMA = 10 ** (-SNR / 10)
 
 # 条件5: 雑音は全センサについて独立同分布なる白色複素ガウス雑音とする
-sigma = 10 ** (-SNR / 10)
-N = np.sqrt(sigma / 2) * (np.random.randn(M, I) + 1j * np.random.randn(M, I))
+N = np.sqrt(SIGMA / 2) * (np.random.randn(M, I) + 1j * np.random.randn(M, I))
 
 
 # 2. シミュレーションに使用する関数の定義
@@ -87,9 +84,9 @@ search_thetas = np.linspace(0, 180, 360 + 1)
 p_bf = [beam_forming_method(t) for t in search_thetas]
 # 正規化
 p_bf = np.array(p_bf) / np.max(p_bf)
-# p_bfが最大となるθを推定値とする
-est_bf_idx = np.argmax(p_bf)
-est_bf_theta = search_thetas[est_bf_idx]
+# p_bfの極大値を持つθを推定値とする
+p_bf_peaks = (np.diff(np.sign(np.diff(p_bf))) < 0).nonzero()[0] + 1
+est_bf_thetas = search_thetas[p_bf_peaks]
 
 
 # 5. 最尤法による到来方向推定
@@ -103,9 +100,14 @@ p_ml = np.zeros((len(ml_search), len(ml_search)))
 for i, t1 in enumerate(ml_search):
     for j, t2 in enumerate(ml_search):
         p_ml[i, j] = maximum_likelihood_method(t1, t2)
+# 正規化
+p_ml = p_ml / np.max(p_ml)
 # p_mlが最大となる(t1, t2)を推定値とする
 idx = np.unravel_index(np.argmax(p_ml), p_ml.shape)
 est_ml_thetas = (ml_search[idx[0]], ml_search[idx[1]])
+# 推定値を小さい順としておく(仮定よりθ1 < θ2)
+if ml_search[idx[0]] > ml_search[idx[1]]:
+    est_ml_thetas = (ml_search[idx[1]], ml_search[idx[0]])
 
 
 # 6. グラフの作成
@@ -113,19 +115,33 @@ est_ml_thetas = (ml_search[idx[0]], ml_search[idx[1]])
 
 # グラフのサイズを設定
 fig = plt.figure(figsize=(12, 5))
+# フォントを指定
+plt.rcParams["font.family"] = "Yu Gothic"
 
 # BF法のグラフ
 ax1 = fig.add_subplot(1, 2, 1)
 # 各θに対するP_BFをプロット
 ax1.plot(search_thetas, p_bf, label="P_BF(θ)")
+# P_BFが極大値を持つθを緑の縦線で表示
+for i in range(min(len(est_bf_thetas), J)):
+    ax1.axvline(
+        est_bf_thetas[i],
+        color="green",
+        linestyle="--",
+        label=f"推定θ{i + 1}: {est_bf_thetas[i]:.1f}°",
+    )
 # 真のθを縦線で表示
-ax1.axvline(TRUE_THETAS[0], color="red", linestyle="--", label=f"True θ1")
-ax1.axvline(TRUE_THETAS[1], color="red", linestyle="--", label=f"True θ2")
+ax1.axvline(
+    TRUE_THETAS[0], color="red", linestyle="--", label=f"真のθ1: {TRUE_THETAS[0]}°"
+)
+ax1.axvline(
+    TRUE_THETAS[1], color="red", linestyle="--", label=f"真のθ2: {TRUE_THETAS[1]}°"
+)
 # タイトルなどを設定
 ax1.set_title("ビームフォーミング法")
 ax1.set_xlabel("θ [°]")
-ax1.set_ylabel("P_BF (正規化済)")
-ax1.legend()
+ax1.set_ylabel("P_BF")
+plt.legend(bbox_to_anchor=(1, 1), loc="upper right", borderaxespad=0.5)
 ax1.grid(True)
 
 # ML法のヒートマップ
@@ -145,25 +161,16 @@ ax2.scatter(
     color="red",
     marker="x",
     s=100,
-    label="真の (θ1, θ2)",
+    label="真の (θ1, θ2): ({:.1f}, {:.1f})".format(TRUE_THETAS[0], TRUE_THETAS[1]),
 )
-# 推定到来方向を白い丸で表示
+# 推定到来方向を緑の丸で表示
 ax2.scatter(
     est_ml_thetas[1],
     est_ml_thetas[0],
-    color="white",
+    color="green",
     marker="o",
-    edgecolors="black",
-    label=f"Est: ({est_ml_thetas[0]:.1f}, {est_ml_thetas[1]:.1f})",
-)
-# 角度の順序を入れ替えたものも推定値として表示
-ax2.scatter(
-    est_ml_thetas[0],
-    est_ml_thetas[1],
-    color="white",
-    marker="o",
-    edgecolors="black",
-    label=f"Est: ({est_ml_thetas[1]:.1f}, {est_ml_thetas[0]:.1f})",
+    edgecolors="green",
+    label=f"推定到来方向: ({est_ml_thetas[0]:.1f}, {est_ml_thetas[1]:.1f})",
 )
 # タイトルなどを設定
 ax2.set_title("最尤法")
